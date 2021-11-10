@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Bin Extractor</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/black-tie/jquery-ui.css" />
+    <script type="text/javascript" src="/eel.js"></script>
+    <script type="text/javascript">
+        $(function() {
+          $('#mInput').autocomplete({
+                source: async function (request, response) {
+                    let term = request.term;
+                    let result = await eel.find_model(term)();
+                    response(result)
+                    }
+          });
+          $('#btn').click(async function(){
+                        let data = await eel.get_data(
+                            $('#mInput').val()
+                        )();
+                        fetch("data:application/octet-stream;base64," + data)
+                        .then(res => res.blob())
+                        .then(blob => {
+                            let blobUrl = window.URL.createObjectURL(blob);
+                            let fileLink = document.createElement('a');
+                            fileLink.href = blobUrl;
+                            fileLink.download = $('#mInput').val().replace('/','_') + '.bin';
+                            fileLink.click();
+                        });
+          });
+        });
+    </script>
+</head>
+<body>
+
+        <div class="ui-widget">
+            <label for="mInput">Введите модель: </label>
+            <input id="mInput" name="model"/>
+            <input type='button' id='btn' class='btn btn-primary' value='Загрузить'>
+        </div>
+
+</body>
+</html>
