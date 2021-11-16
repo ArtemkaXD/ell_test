@@ -19,7 +19,7 @@ def find_model(model):
         sqlite_select_query = (f"select  enumber from enumber_docs WHERE"
                                f" enumber like '{model}%' and docnum like '8%'"
                                f"LIMIT 10")
-        record = [item[0] for item in cursor.execute(sqlite_select_query)]
+        record = list(set([item[0] for item in cursor.execute(sqlite_select_query)]))
         cursor.close()
 
     except sqlite3.Error as error:
@@ -43,7 +43,7 @@ def get_data(model):
         sqlite_select_query = (f"select docnum from enumber_docs WHERE"
                                f" enumber like '{model}' and docnum like '8%'")
         cursor.execute(sqlite_select_query)
-        record = str(cursor.fetchone()[0])
+        records = cursor.fetchall()
         cursor.close()
 
     except sqlite3.Error as error:
@@ -54,41 +54,46 @@ def get_data(model):
         if (sqlite_connection):
             sqlite_connection.close()
 
-    if not record:
+    if not records:
         return 0
 
     filelist = os.listdir(i_path)
-    file = ''
-    for file in filelist:
-        if record in file:
-            break
-
-    arc_path = i_path + file
-    config = configparser.ConfigParser()
-    
-    with zipfile.ZipFile(arc_path, 'r') as zip1:
-        for f_name in zip1.namelist():
-            if f_name.lower() == 'z_cpu.ini':
-                config_file = f_name
+    obj = {}
+    for id, record in enumerate(records):
+        record = str(record[0])
+        file = ''
+        for file in filelist:
+            if record in file:
                 break
 
-        try:
-            config.read_string(zip1.read('config_file').decode("utf-8"))
-        except KeyError:
-            return 0
-        mcu = config['Controller']['Name']
-        if 'STM32F1XX' == mcu:
-            st = int('8000000', 16)
-        elif 'R5F2136CA' == mcu:
-            st = 0
-        else:
-            return 0
+        arc_path = i_path + file
+        config = configparser.ConfigParser()
+        
+        with zipfile.ZipFile(arc_path, 'r') as zip1:
+            for f_name in zip1.namelist():
+                if f_name.lower() == 'z_cpu.ini':
+                    config_file = f_name
+                    try:
+                        config.read_string(zip1.read(config_file).decode("utf-8"))
+                    except KeyError:
+                        return 0
+                    mcu = config['Controller']['Name']
+                    if 'STM32F1XX' == mcu:
+                        st = int('8000000', 16)
+                    elif 'R5F2136CA' == mcu:
+                        st = 0
+                    else:
+                        return 0
 
-        file = bc.BinFile()
-        file.add_srec(zip1.read('z_Software.s19').decode("utf-8"), overwrite=True)
+                    file = bc.BinFile()
+                    file.add_srec(zip1.read('z_Software.s19').decode("utf-8"), overwrite=True)
+                    key = f'{model.replace("/","_")}({id}).bin'
+                    obj[key] = base64.b64encode(file.as_binary(st)).decode('utf-8')
+                elif 'merged' in f_name.lower():
+                    key = f'{model.replace("/","_")}_{f_name[0:2]}({id}).s2'
+                    obj[key] = base64.b64encode(zip1.read(f_name)).decode('utf-8')
 
-    return base64.b64encode(file.as_binary(st)).decode('utf-8')
-
+    return obj
 
 def check_db(path):
     result = 0
