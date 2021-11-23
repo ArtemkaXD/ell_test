@@ -20,6 +20,7 @@ def find_model(model):
                                f" enumber like '{model}%' and docnum like '8%'"
                                f"LIMIT 10")
         record = list(set([item[0] for item in cursor.execute(sqlite_select_query)]))
+        record.sort()
         cursor.close()
 
     except sqlite3.Error as error:
